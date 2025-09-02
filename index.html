@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skrunk Cyber Drawing Studio</title>
+<style>
+    body {
+        margin: 0;
+        background: #0d0d0d;
+        font-family: 'Arial', sans-serif;
+        color: #0ff;
+        overflow: hidden;
+    }
+    #toolbar {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        height: 70px;
+        background: #111;
+        border-bottom: 2px solid #0ff;
+        display: flex;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 10;
+        gap: 10px;
+    }
+    button, select, input[type=range], input[type=color] {
+        background: #111;
+        border: 2px solid #0ff;
+        color: #0ff;
+        padding: 6px 12px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-size: 14px;
+        transition: 0.2s;
+    }
+    button:hover, select:hover, input[type=range]:hover, input[type=color]:hover {
+        background: #0ff;
+        color: #111;
+    }
+    #colorPreview {
+        width: 30px;
+        height: 30px;
+        border: 2px solid #0ff;
+        border-radius: 5px;
+    }
+    #canvas {
+        position: absolute;
+        top: 70px;
+        left: 0;
+        width: 100%;
+        height: calc(100% - 70px);
+        background: #111;
+        cursor: crosshair;
+    }
+    #status {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        height: 24px;
+        background: #111;
+        border-top: 2px solid #0ff;
+        color: #0ff;
+        padding-left: 10px;
+        line-height: 24px;
+        font-size: 14px;
+    }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+    <button id="clearBtn">Clear</button>
+    <button id="eraserBtn">Eraser OFF</button>
+    <label>Brush:</label>
+    <select id="brushType">
+        <option value="pencil">Pencil</option>
+        <option value="marker">Marker</option>
+        <option value="neon">Neon Glow</option>
+        <option value="pen">Pen</option>
+    </select>
+    <input type="color" id="colorPicker" value="#00ffff">
+    <div id="colorPreview"></div>
+    <label for="brushSize">Size:</label>
+    <input type="range" id="brushSize" min="1" max="50" value="5">
+    <button id="undoBtn">Undo</button>
+    <button id="redoBtn">Redo</button>
+    <button id="saveBtn">Save PNG</button>
+</div>
+
+<canvas id="canvas"></canvas>
+<div id="status">Tool: Pencil | Color: #00ffff | Size: 5</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let drawing = false, eraser = false;
+let brushColor = '#00ffff', brushSize = 5, brushType = 'pencil';
+let lastX = 0, lastY = 0;
+
+let undoStack = [], redoStack = [];
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 70;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function saveState() {
+    if (undoStack.length >= 50) undoStack.shift();
+    undoStack.push(canvas.toDataURL());
+    redoStack = [];
+}
+
+canvas.addEventListener('mousedown', e => {
+    drawing = true;
+    lastX = e.offsetX;
+    lastY = e.offsetY;
+    saveState();
+});
+
+canvas.addEventListener('mouseup', () => drawing = false);
+canvas.addEventListener('mouseout', () => drawing = false);
+canvas.addEventListener('mousemove', draw);
+
+function draw(e) {
+    if (!drawing) return;
+
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (eraser) {
+        ctx.strokeStyle = '#111';
+        ctx.shadowBlur = 0;
+    } else {
+        ctx.strokeStyle = brushColor;
+        if (brushType === 'neon') {
+            ctx.shadowColor = brushColor;
+            ctx.shadowBlur = 15;
+        } else {
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.globalAlpha = brushType === 'marker' ? 0.5 : 1.0;
+    ctx.stroke();
+    lastX = e.offsetX;
+    lastY = e.offsetY;
+    updateStatus();
+}
+
+document.getElementById('colorPicker').addEventListener('input', e => {
+    brushColor = e.target.value;
+    document.getElementById('colorPreview').style.background = brushColor;
+    updateStatus();
+    if (eraser) toggleEraser();
+});
+
+document.getElementById('brushSize').addEventListener('input', e => {
+    brushSize = e.target.value;
+    updateStatus();
+});
+
+document.getElementById('brushType').addEventListener('change', e => {
+    brushType = e.target.value;
+    updateStatus();
+});
+
+document.getElementById('eraserBtn').addEventListener('click', toggleEraser);
+function toggleEraser() {
+    eraser = !eraser;
+    document.getElementById('eraserBtn').textContent = eraser ? 'Eraser ON' : 'Eraser OFF';
+    updateStatus();
+}
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    saveState();
+});
+
+document.getElementById('undoBtn').addEventListener('click', () => {
+    if (undoStack.length > 0) {
+        redoStack.push(canvas.toDataURL());
+        const imgData = undoStack.pop();
+        const img = new Image();
+        img.src = imgData;
+        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    }
+});
+
+document.getElementById('redoBtn').addEventListener('click', () => {
+    if (redoStack.length > 0) {
+        undoStack.push(canvas.toDataURL());
+        const imgData = redoStack.pop();
+        const img = new Image();
+        img.src = imgData;
+        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    }
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = 'drawing.png';
+    link.href = canvas.toDataURL();
+    link.click();
+});
+
+function updateStatus() {
+    document.getElementById('status').textContent =
+        `Tool: ${eraser ? 'Eraser' : brushType} | Color: ${brushColor} | Size: ${brushSize}`;
+}
+
+// Initialize canvas
+ctx.fillStyle = '#111';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+updateStatus();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+    if (e.key === 'e') toggleEraser();
+    if (e.key === 'u') document.getElementById('undoBtn').click();
+    if (e.key === 'r') document.getElementById('redoBtn').click();
+});
+</script>
+
+</body>
+</html>
