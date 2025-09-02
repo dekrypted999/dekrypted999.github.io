@@ -6,11 +6,11 @@
 <title>Skrunk Cyber Drawing Studio</title>
 <style>
 body {margin:0; background:#0d0d0d; font-family:Arial,sans-serif; color:#0ff; overflow:hidden;}
-#toolbar {position:fixed; top:0; width:100%; height:70px; background:#111; border-bottom:2px solid #0ff; display:flex; align-items:center; padding:0 20px; z-index:10; gap:10px;}
+#toolbar {position:fixed; top:0; width:100%; height:70px; background:#111; border-bottom:2px solid #0ff; display:flex; align-items:center; padding:0 10px; z-index:10; gap:8px; flex-wrap:wrap;}
 button, select, input[type=range], input[type=color] {background:#111; border:2px solid #0ff; color:#0ff; padding:6px 12px; cursor:pointer; border-radius:5px; font-size:14px; transition:0.2s;}
 button:hover, select:hover, input[type=range]:hover, input[type=color]:hover {background:#0ff; color:#111;}
 #colorPreview {width:30px; height:30px; border:2px solid #0ff; border-radius:5px;}
-#canvas {position:absolute; top:70px; left:0; width:100%; height:calc(100%-70px); background:#111; cursor:crosshair;}
+#canvas {position:absolute; top:70px; left:0; width:100%; height:calc(100%-70px); background:#111; touch-action:none; cursor:crosshair;}
 #status {position:fixed; bottom:0; width:100%; height:24px; background:#111; border-top:2px solid #0ff; color:#0ff; padding-left:10px; line-height:24px; font-size:14px;}
 </style>
 </head>
@@ -44,7 +44,6 @@ const ctx = canvas.getContext('2d');
 let drawing = false, eraser = false;
 let brushColor = '#00ffff', brushSize = 5, brushType = 'pencil';
 let lastX = 0, lastY = 0;
-
 let undoStack = [], redoStack = [];
 
 function resizeCanvas() {
@@ -60,42 +59,42 @@ function saveState() {
     redoStack = [];
 }
 
-// Mouse & touch helpers
-function getTouchPos(touchEvent) {
+// Touch helpers
+function getTouchPos(e){
     const rect = canvas.getBoundingClientRect();
-    return { x: touchEvent.touches[0].clientX - rect.left, y: touchEvent.touches[0].clientY - rect.top };
+    return { x:e.touches[0].clientX - rect.left, y:e.touches[0].clientY - rect.top };
 }
 
-// Start drawing
-canvas.addEventListener('mousedown', e => { drawing=true; lastX=e.offsetX; lastY=e.offsetY; saveState(); });
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const pos=getTouchPos(e); lastX=pos.x; lastY=pos.y; saveState(); });
-
-// Stop drawing
-canvas.addEventListener('mouseup', ()=>drawing=false);
-canvas.addEventListener('mouseout', ()=>drawing=false);
-canvas.addEventListener('touchend', ()=>drawing=false);
-canvas.addEventListener('touchcancel', ()=>drawing=false);
-
-// Draw
-canvas.addEventListener('mousemove', draw);
-canvas.addEventListener('touchmove', e => { e.preventDefault(); const pos=getTouchPos(e); draw({offsetX: pos.x, offsetY: pos.y}); });
-
+// Draw function (mouse + touch)
 function draw(e) {
-    if (!drawing) return;
+    if(!drawing) return;
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = eraser ? '#111' : brushColor;
-    ctx.shadowBlur = (!eraser && brushType==='neon') ? 15 : 0;
-    ctx.shadowColor = (!eraser && brushType==='neon') ? brushColor : 0;
+    ctx.strokeStyle = eraser?'#111':brushColor;
+    ctx.shadowBlur = (!eraser && brushType==='neon')?15:0;
+    ctx.shadowColor = (!eraser && brushType==='neon')?brushColor:0;
     ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(e.offsetX, e.offsetY);
+    ctx.moveTo(lastX,lastY);
+    ctx.lineTo(e.offsetX,e.offsetY);
     ctx.globalAlpha = (brushType==='marker' && !eraser)?0.5:1.0;
     ctx.stroke();
-    lastX = e.offsetX; lastY = e.offsetY;
+    lastX = e.offsetX;
+    lastY = e.offsetY;
     updateStatus();
 }
+
+// Mouse events
+canvas.addEventListener('mousedown', e => { drawing=true; lastX=e.offsetX; lastY=e.offsetY; saveState(); });
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', ()=>drawing=false);
+canvas.addEventListener('mouseout', ()=>drawing=false);
+
+// Touch events
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; let pos=getTouchPos(e); lastX=pos.x; lastY=pos.y; saveState(); });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); let pos=getTouchPos(e); draw({offsetX:pos.x, offsetY:pos.y}); });
+canvas.addEventListener('touchend', ()=>drawing=false);
+canvas.addEventListener('touchcancel', ()=>drawing=false);
 
 // Toolbar
 document.getElementById('colorPicker').addEventListener('input', e => { brushColor=e.target.value; document.getElementById('colorPreview').style.background=brushColor; if(eraser) toggleEraser(); updateStatus(); });
@@ -127,5 +126,6 @@ document.addEventListener('keydown', e=>{
     if(e.key==='r') document.getElementById('redoBtn').click();
 });
 </script>
+
 </body>
 </html>
