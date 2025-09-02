@@ -2,16 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Drawing Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Skrunk Cyber Drawing Studio</title>
 <style>
 body {margin:0; background:#0d0d0d; font-family:Arial,sans-serif; color:#0ff; overflow:hidden;}
 #toolbar {position:fixed; top:0; width:100%; height:70px; background:#111; border-bottom:2px solid #0ff; display:flex; align-items:center; padding:0 10px; z-index:10; gap:8px; flex-wrap:wrap;}
 button, select, input[type=range], input[type=color] {background:#111; border:2px solid #0ff; color:#0ff; padding:6px 12px; cursor:pointer; border-radius:5px; font-size:14px; transition:0.2s;}
 button:hover, select:hover, input[type=range]:hover, input[type=color]:hover {background:#0ff; color:#111;}
 #colorPreview {width:30px; height:30px; border:2px solid #0ff; border-radius:5px;}
-#canvas {position:absolute; top:70px; left:0; width:100%; height:calc(100%-70px); background:#111; touch-action:none; cursor:crosshair;}
+#canvas {position:absolute; background:#111; touch-action:none; cursor:crosshair;}
 #status {position:fixed; bottom:0; width:100%; height:24px; background:#111; border-top:2px solid #0ff; color:#0ff; padding-left:10px; line-height:24px; font-size:14px;}
+
+/* Mobile / Tablet adjustments */
+@media (max-width:768px){
+    #toolbar {flex-wrap:wrap; height:auto; padding:5px; gap:5px;}
+    button, select, input[type=range], input[type=color]{padding:4px 8px; font-size:12px;}
+}
 </style>
 </head>
 <body>
@@ -41,22 +47,34 @@ button:hover, select:hover, input[type=range]:hover, input[type=color]:hover {ba
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-let drawing = false, eraser = false;
-let brushColor = '#00ffff', brushSize = 5, brushType = 'pencil';
-let lastX = 0, lastY = 0;
-let undoStack = [], redoStack = [];
+let drawing=false, eraser=false;
+let brushColor='#00ffff', brushSize=5, brushType='pencil';
+let lastX=0,lastY=0;
+let undoStack=[], redoStack=[];
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight - 70;
+// Resize canvas and adjust for mobile/tablet zoomed-out view
+function resizeCanvas(){
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if(w<=768){ // mobile / small tablet
+        canvas.width = w*0.9;
+        canvas.height = (h-70)*0.9;
+        canvas.style.left='5%';
+        canvas.style.top='75px';
+    } else {
+        canvas.width = w;
+        canvas.height = h-70;
+        canvas.style.left='0';
+        canvas.style.top='70px';
+    }
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-function saveState() {
-    if (undoStack.length >= 50) undoStack.shift();
+function saveState(){
+    if(undoStack.length>=50) undoStack.shift();
     undoStack.push(canvas.toDataURL());
-    redoStack = [];
+    redoStack=[];
 }
 
 // Touch helpers
@@ -65,56 +83,56 @@ function getTouchPos(e){
     return { x:e.touches[0].clientX - rect.left, y:e.touches[0].clientY - rect.top };
 }
 
-// Draw function (mouse + touch)
-function draw(e) {
+// Draw function
+function draw(e){
     if(!drawing) return;
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = eraser?'#111':brushColor;
-    ctx.shadowBlur = (!eraser && brushType==='neon')?15:0;
-    ctx.shadowColor = (!eraser && brushType==='neon')?brushColor:0;
+    ctx.lineWidth=brushSize;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.strokeStyle=eraser?'#111':brushColor;
+    ctx.shadowBlur=(!eraser && brushType==='neon')?15:0;
+    ctx.shadowColor=(!eraser && brushType==='neon')?brushColor:0;
     ctx.beginPath();
     ctx.moveTo(lastX,lastY);
     ctx.lineTo(e.offsetX,e.offsetY);
-    ctx.globalAlpha = (brushType==='marker' && !eraser)?0.5:1.0;
+    ctx.globalAlpha=(brushType==='marker' && !eraser)?0.5:1.0;
     ctx.stroke();
-    lastX = e.offsetX;
-    lastY = e.offsetY;
+    lastX=e.offsetX;
+    lastY=e.offsetY;
     updateStatus();
 }
 
 // Mouse events
-canvas.addEventListener('mousedown', e => { drawing=true; lastX=e.offsetX; lastY=e.offsetY; saveState(); });
+canvas.addEventListener('mousedown', e=>{drawing=true; lastX=e.offsetX; lastY=e.offsetY; saveState();});
 canvas.addEventListener('mousemove', draw);
 canvas.addEventListener('mouseup', ()=>drawing=false);
 canvas.addEventListener('mouseout', ()=>drawing=false);
 
 // Touch events
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; let pos=getTouchPos(e); lastX=pos.x; lastY=pos.y; saveState(); });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); let pos=getTouchPos(e); draw({offsetX:pos.x, offsetY:pos.y}); });
+canvas.addEventListener('touchstart', e=>{e.preventDefault(); drawing=true; const pos=getTouchPos(e); lastX=pos.x; lastY=pos.y; saveState();});
+canvas.addEventListener('touchmove', e=>{e.preventDefault(); const pos=getTouchPos(e); draw({offsetX:pos.x, offsetY:pos.y});});
 canvas.addEventListener('touchend', ()=>drawing=false);
 canvas.addEventListener('touchcancel', ()=>drawing=false);
 
 // Toolbar
-document.getElementById('colorPicker').addEventListener('input', e => { brushColor=e.target.value; document.getElementById('colorPreview').style.background=brushColor; if(eraser) toggleEraser(); updateStatus(); });
-document.getElementById('brushSize').addEventListener('input', e=>{ brushSize=e.target.value; updateStatus(); });
-document.getElementById('brushType').addEventListener('change', e=>{ brushType=e.target.value; updateStatus(); });
+document.getElementById('colorPicker').addEventListener('input', e=>{brushColor=e.target.value; document.getElementById('colorPreview').style.background=brushColor; if(eraser) toggleEraser(); updateStatus();});
+document.getElementById('brushSize').addEventListener('input', e=>{brushSize=e.target.value; updateStatus();});
+document.getElementById('brushType').addEventListener('change', e=>{brushType=e.target.value; updateStatus();});
 document.getElementById('eraserBtn').addEventListener('click', toggleEraser);
-function toggleEraser(){ eraser=!eraser; document.getElementById('eraserBtn').textContent=eraser?'Eraser ON':'Eraser OFF'; updateStatus(); }
+function toggleEraser(){eraser=!eraser; document.getElementById('eraserBtn').textContent=eraser?'Eraser ON':'Eraser OFF'; updateStatus();}
 
-document.getElementById('clearBtn').addEventListener('click', ()=>{ ctx.fillStyle='#111'; ctx.fillRect(0,0,canvas.width,canvas.height); saveState(); });
+document.getElementById('clearBtn').addEventListener('click', ()=>{ctx.fillStyle='#111'; ctx.fillRect(0,0,canvas.width,canvas.height); saveState();});
 document.getElementById('undoBtn').addEventListener('click', ()=>{
-    if(undoStack.length>0){ redoStack.push(canvas.toDataURL()); const img=new Image(); img.src=undoStack.pop(); img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height); }
+    if(undoStack.length>0){ redoStack.push(canvas.toDataURL()); const img=new Image(); img.src=undoStack.pop(); img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);}
 });
 document.getElementById('redoBtn').addEventListener('click', ()=>{
-    if(redoStack.length>0){ undoStack.push(canvas.toDataURL()); const img=new Image(); img.src=redoStack.pop(); img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height); }
+    if(redoStack.length>0){ undoStack.push(canvas.toDataURL()); const img=new Image(); img.src=redoStack.pop(); img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);}
 });
 document.getElementById('saveBtn').addEventListener('click', ()=>{
     const link=document.createElement('a'); link.download='drawing.png'; link.href=canvas.toDataURL(); link.click();
 });
 
-function updateStatus(){ document.getElementById('status').textContent=`Tool: ${eraser?'Eraser':brushType} | Color: ${brushColor} | Size: ${brushSize}`; }
+function updateStatus(){ document.getElementById('status').textContent=`Tool: ${eraser?'Eraser':brushType} | Color: ${brushColor} | Size: ${brushSize}`;}
 
 // Initialize canvas
 ctx.fillStyle='#111'; ctx.fillRect(0,0,canvas.width,canvas.height); updateStatus();
